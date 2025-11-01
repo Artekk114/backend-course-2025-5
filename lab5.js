@@ -2,6 +2,7 @@ const {program} = require("commander");
 const http = require("http");
 const fs =require("fs");
 const path = require("path");
+const fsp= fs.promises
 
 program
 
@@ -41,9 +42,56 @@ const cachePath = path.resolve(options.cache);
 const host = options.host;
 const port = options.port;
 
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-  res.end("Сервер працює!");
+const server = http.createServer(async (req, res) => {
+const urlPath = req.url.slice(1);
+ const filePath = path.join(cachePath, `${urlPath}.jpg`);
+
+ try {
+  switch(req.method){
+    case "GET":
+      try{
+        const data = await fsp.readFile(filePath);
+        res.writeHead(200, { "Content-Type": "image/jpeg" });
+          res.end(data);
+      } catch{
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Файл не знайдено у кеші");
+      } 
+       break;
+    case "PUT":
+      let body = [];
+      req.on("data", chunk => body.push(chunk));
+      req.on("end", async () => {
+          const buffer = Buffer.concat(body);
+          await fsp.writeFile(filePath, buffer);
+          res.writeHead(201, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Файл збережено в кеші");
+      });
+      break;
+    case "DELETE":
+      try {
+           await fsp.unlink(filePath);
+          res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Файл видалено з кешу");
+        } catch {
+          res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Файл для видалення не знайдено");
+        }
+        break;
+     default:
+        res.writeHead(405, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Метод не дозволено");
+
+      }
+    }
+  catch(err){
+    res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Внутрішня помилка сервера: " + err.message);
+  }
+
+
+
+
 });
 
 server.listen(port, host, () => {
