@@ -2,7 +2,8 @@ const {program} = require("commander");
 const http = require("http");
 const fs =require("fs");
 const path = require("path");
-const fsp= fs.promises
+const fsp= fs.promises;
+const superagent = require("superagent");
 
 program
 
@@ -54,8 +55,23 @@ const urlPath = req.url.slice(1);
         res.writeHead(200, { "Content-Type": "image/jpeg" });
           res.end(data);
       } catch{
-        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-          res.end("Файл не знайдено у кеші");
+       console.log("Файл не знайдено в кеші");
+       try{
+            const response = await superagent.get(`https://http.cat/${urlPath}`);
+            const imageData = response.body;
+
+            
+            await fsp.writeFile(filePath, imageData);
+            console.log("Збережено у кеш: ${filePath}");
+
+            
+            res.writeHead(200, { "Content-Type": "image/jpeg" });
+            res.end(imageData);
+       }catch(err){
+        console.error("Помилка запиту до http.cat");
+         res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Зображення не знайдено на сервері http.cat");
+       }
       } 
        break;
     case "PUT":
@@ -95,8 +111,7 @@ const urlPath = req.url.slice(1);
 });
 
 server.listen(port, host, () => {
-  console.log(`
-  Сервер запущено на http://${host}:${port}`);
+  console.log(`Сервер запущено на http://${host}:${port}`);
 });
 
 
